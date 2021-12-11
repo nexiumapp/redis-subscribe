@@ -18,7 +18,7 @@ use tokio::{
 use tokio_stream::Stream;
 
 use crate::command::Command;
-use crate::message::Message;
+pub use crate::message::Message;
 
 /// Redis subscription object.
 /// This connects to the Redis server.
