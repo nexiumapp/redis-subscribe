@@ -1,4 +1,5 @@
 mod command;
+mod error;
 mod message;
 mod parser;
 
@@ -18,6 +19,7 @@ use tokio::{
 use tokio_stream::Stream;
 
 use crate::command::Command;
+pub use crate::error::*;
 pub use crate::message::Message;
 
 /// Redis subscription object.
@@ -44,45 +46,70 @@ impl RedisSub {
     }
 
     /// Subscribe to a channel.
-    pub async fn subscribe(&self, channel: String) -> bool {
+    pub async fn subscribe(&self, channel: String) -> crate::Result<()> {
         self.channels.lock().await.insert(channel.clone());
 
-        self.send_cmd(Command::Subscribe(channel)).await.is_ok()
+        self.send_cmd(Command::Subscribe(channel)).await
     }
 
     /// Unsubscribe from a channel.
-    pub async fn unsubscribe(&self, channel: String) -> bool {
+    pub async fn unsubscribe(&self, channel: String) -> crate::Result<()> {
         if !self.channels.lock().await.remove(&channel) {
-            return false;
+            return Err(crate::Error::NotSubscribed);
         }
 
-        self.send_cmd(Command::Unsubscribe(channel)).await.is_ok()
+        self.send_cmd(Command::Unsubscribe(channel)).await
+    }
+
+    /// Connect to the Redis server specified by `self.addr`.
+    ///
+    /// Handles exponential backoff.
+    ///
+    /// Returns a split TCP stream.
+    ///
+    /// # Errors
+    /// Returns an error if attempting connection failed eight times.
+    pub(crate) async fn connect(&self) -> crate::Result<(OwnedReadHalf, OwnedWriteHalf)> {
+        let mut retry_count = 0;
+
+        loop {
+            // Generate jitter for the backoff function.
+            let jitter = thread_rng().gen_range(0..1000);
+            // Connect to the Redis server.
+            match TcpStream::connect(self.addr.as_str()).await {
+                Ok(stream) => return Ok(stream.into_split()),
+                Err(_) if retry_count <= 7 => {
+                    // Backoff and reconnect.
+                    retry_count += 1;
+                    let timeout = cmp::min(retry_count ^ 2, 64) * 1000 + jitter;
+                    sleep(Duration::from_millis(timeout)).await;
+                    continue;
+                }
+                Err(e) => {
+                    // Retry count has passed 7.
+                    // Assume connection failed and return.
+                    return Err(crate::Error::IoError(e));
+                }
+            };
+        }
+    }
+
+    async fn subscribe_stored(&self) -> crate::Result<()> {
+        for channel in self.channels.lock().await.iter() {
+            self.send_cmd(Command::Subscribe(channel.to_string()))
+                .await?
+        }
+
+        Ok(())
     }
 
     /// Listen for incoming messages.
     /// Only here the server connects to the Redis server.
     /// It handles reconnection and backoff for you.
     pub async fn listen(&self) -> impl Stream<Item = Message> + '_ {
-        let mut retry_count = 0;
-
         Box::pin(stream! {
             loop {
-                // Generate jitter for the backoff function.
-                let jitter = thread_rng().gen_range(0..1000);
-                // Connect to the Redis server.
-                let (mut read, write) = match TcpStream::connect(self.addr.as_str()).await {
-                    Ok(stream) => stream.into_split(),
-                    Err(_) => {
-                        // Backoff and reconnect.
-                        retry_count += 1;
-                        let timeout = cmp::min(retry_count^2, 64) * 1000 + jitter;
-                        sleep(Duration::from_millis(timeout)).await;
-                        continue;
-                    },
-                };
-
-                // Reset the retry counter.
-                retry_count = 0;
+                let (read, write) = self.connect().await;
 
                 // Update the stored writer.
                 let mut stored_writer = self.writer.lock().await;
@@ -112,27 +139,35 @@ impl RedisSub {
                 let mut buf = [0; 64 * 1024];
                 let mut unread_buf = String::new();
 
-                loop {
-                    // Read incomming data to the buffer.
+                'inner: loop {
+                    // Read incoming data to the buffer.
                     let res = match read.read(&mut buf).await {
-                        Ok(0) => Err(()),
+                        Ok(0) => Err(crate::Error::ZeroBytesRead),
                         Ok(n) => Ok(n),
-                        Err(_) => Err(()),
+                        Err(e) => Err(e),
                     };
 
-                    /// Disconnect and reconnect if a write error occured.
+                    // Disconnect and reconnect if a write error occurred.
                     let n = match res {
                         Ok(n) => n,
-                        Err(_) => {
+                        Err(e) => {
                             *self.writer.lock().await = None;
-                            yield Message::Disconnected;
+                            yield Message::Disconnected(e);
                             sleep(Duration::from_millis(500 + jitter)).await;
-                            break;
+                            break 'inner;
+                        }
+                    };
+
+                    let buf_data = match std::str::from_utf8(&buf[..n]) {
+                        Ok(d) => d,
+                        Err(e) => {
+                            yield Message::Error(e.into());
+                            continue;
                         }
                     };
 
                     // Add the new data to the unread buffer.
-                    unread_buf.push_str(std::str::from_utf8(&buf[..n]).unwrap());
+                    unread_buf.push_str(buf_data);
                     // Parse the unread data.
                     let parsed = parser::parse(&mut unread_buf);
 
@@ -150,19 +185,14 @@ impl RedisSub {
     }
 
     /// Send a command to the server.
-    async fn send_cmd(&self, command: Command) -> Result<(), String> {
-        match &mut *self.writer.lock().await {
-            Some(writer) => {
-                if writer.writable().await.is_err() {
-                    return Ok(());
-                }
+    async fn send_cmd(&self, command: Command) -> crate::Result<()> {
+        if let Some(writer) = &mut *self.writer.lock().await {
+            writer.writable().await?;
 
-                match writer.write_all(command.to_string().as_bytes()).await {
-                    Ok(_) => Ok(()),
-                    Err(_) => Err(String::from("Failed to send message.")),
-                }
-            }
-            None => Ok(()),
+            debug!("sending command {} to redis", &command);
+            writer.write_all(command.to_string().as_bytes()).await?;
         }
+
+        Ok(())
     }
 }
