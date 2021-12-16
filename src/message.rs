@@ -144,3 +144,47 @@ impl Message {
         })
     }
 }
+
+impl Message {
+    #[must_use]
+    #[inline]
+    pub const fn is_subscription(&self) -> bool {
+        matches!(self, Self::Subscription { .. })
+    }
+
+    #[must_use]
+    #[inline]
+    pub const fn is_unsubscription(&self) -> bool {
+        matches!(self, Self::Unsubscription { .. })
+    }
+
+    #[must_use]
+    #[inline]
+    pub const fn is_message(&self) -> bool {
+        matches!(self, Self::Message { .. })
+    }
+
+    #[must_use]
+    #[inline]
+    pub const fn is_pattern_message(&self) -> bool {
+        matches!(self, Self::PatternMessage { .. })
+    }
+
+    #[must_use]
+    #[inline]
+    pub const fn is_connected(&self) -> bool {
+        matches!(self, Self::Connected)
+    }
+
+    #[must_use]
+    #[inline]
+    pub const fn is_disconnected(&self) -> bool {
+        matches!(self, Self::Disconnected(_))
+    }
+
+    #[must_use]
+    #[inline]
+    pub const fn is_error(&self) -> bool {
+        matches!(self, Self::Error(_))
+    }
+}
