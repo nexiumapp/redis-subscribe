@@ -42,9 +42,9 @@ impl Message {
 
         // Match on the first element text.
         match channel.to_lowercase().as_str() {
-            "subscribe" => Message::from_subscribe(&arr),
-            "unsubscribe" => Message::from_unsubscribe(&arr),
-            "message" => Message::from_message(&arr),
+            "subscribe" => Self::from_subscribe(&arr),
+            "unsubscribe" => Self::from_unsubscribe(&arr),
+            "message" => Self::from_message(&arr),
             _ => Err(Error::ParserError(ParserError::UnknownType)),
         }
     }
