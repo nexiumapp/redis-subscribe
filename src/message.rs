@@ -3,9 +3,23 @@ use crate::Error;
 
 #[derive(Debug)]
 pub enum Message {
-    Subscription { channel: String, subscriptions: i64 },
-    Unsubscription { channel: String, subscriptions: i64 },
-    Message { channel: String, message: String },
+    Subscription {
+        channel: String,
+        subscriptions: i64,
+    },
+    Unsubscription {
+        channel: String,
+        subscriptions: i64,
+    },
+    Message {
+        channel: String,
+        message: String,
+    },
+    PatternMessage {
+        pattern: String,
+        channel: String,
+        message: String,
+    },
     Connected,
     Disconnected(Error),
     Error(Error),
@@ -19,6 +33,7 @@ pub enum ParserError {
 
     InvalidSubscriptionChannel,
     InvalidSubscriptionCount,
+    InvalidSubscriptionPattern,
 
     InvalidUnsubscriptionChannel,
     InvalidUnsubscriptionCount,
@@ -47,6 +62,7 @@ impl Message {
             "subscribe" => Self::from_subscribe(&arr),
             "unsubscribe" => Self::from_unsubscribe(&arr),
             "message" => Self::from_message(&arr),
+            "pmessage" => Self::from_pmessage(&arr),
             _ => Err(Error::ParserError(ParserError::UnknownType)),
         }
     }
@@ -102,5 +118,29 @@ impl Message {
         }?;
 
         Ok(Self::Message { channel, message })
+    }
+
+    /// parse the response to a pattern message
+    fn from_pmessage(res: &[parser::Response]) -> crate::Result<Self> {
+        let pattern = match res.get(1) {
+            Some(parser::Response::Bulk(pattern)) => Ok((*pattern).clone()),
+            _ => Err(Error::ParserError(ParserError::InvalidSubscriptionPattern)),
+        }?;
+
+        let channel = match res.get(2) {
+            Some(parser::Response::Bulk(channel)) => Ok((*channel).clone()),
+            _ => Err(Error::ParserError(ParserError::InvalidSubscriptionChannel)),
+        }?;
+
+        let message = match res.get(3) {
+            Some(parser::Response::Bulk(message)) => Ok((*message).clone()),
+            _ => Err(Error::ParserError(ParserError::InvalidSubscriptionCount)),
+        }?;
+
+        Ok(Self::PatternMessage {
+            pattern,
+            channel,
+            message,
+        })
     }
 }
