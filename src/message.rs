@@ -1,5 +1,4 @@
 use super::parser;
-use crate::parser::Response;
 use crate::Error;
 
 #[derive(Debug)]
@@ -27,6 +26,9 @@ pub enum ParserError {
 
 impl Message {
     /// Parse the response to a message.
+    ///
+    /// # Errors
+    /// Returns an error if the response has unexpected types.
     pub fn from_response(res: parser::Response) -> crate::Result<Self> {
         // Make sure the response is a array.
         let arr = match res {

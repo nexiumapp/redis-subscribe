@@ -56,6 +56,9 @@ impl RedisSub {
     }
 
     /// Subscribe to a channel.
+    ///
+    /// # Errors
+    /// Returns an error if an error happens on the underlying TCP stream.
     pub async fn subscribe(&self, channel: String) -> crate::Result<()> {
         self.channels.lock().await.insert(channel.clone());
 
@@ -63,6 +66,9 @@ impl RedisSub {
     }
 
     /// Unsubscribe from a channel.
+    ///
+    /// # Errors
+    /// Returns an error if an error happens on the underlying TCP stream.
     pub async fn unsubscribe(&self, channel: String) -> crate::Result<()> {
         if !self.channels.lock().await.remove(&channel) {
             return Err(crate::Error::NotSubscribed);
@@ -72,6 +78,9 @@ impl RedisSub {
     }
 
     /// Subscribe to a pattern of channels.
+    ///
+    /// # Errors
+    /// Returns an error if an error happens on the underlying TCP stream.
     pub async fn psubscribe(&self, channel: String) -> crate::Result<()> {
         self.channels.lock().await.insert(channel.clone());
 
@@ -79,6 +88,9 @@ impl RedisSub {
     }
 
     /// Unsubscribe from a pattern of channels.
+    ///
+    /// # Errors
+    /// Returns an error if an error happens on the underlying TCP stream.
     pub async fn punsubscribe(&self, channel: String) -> crate::Result<()> {
         if !self.channels.lock().await.remove(&channel) {
             return Err(crate::Error::NotSubscribed);
