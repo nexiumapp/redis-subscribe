@@ -23,13 +23,13 @@ pub fn parse<'a>(input: &mut String) -> Vec<Response> {
     let mut result = Vec::new();
 
     loop {
-        let (rem, res) = match parse_response(input.as_str()) {
+        let (remainder, response) = match parse_response(input.as_str()) {
             Ok(parsed) => parsed,
             Err(_) => return result,
         };
 
-        result.push(res);
-        *input = rem.to_string();
+        result.push(response);
+        *input = remainder.to_string();
     }
 }
 
@@ -45,40 +45,41 @@ fn parse_response(input: &str) -> NomResult<Response> {
 }
 
 fn parse_simple(input: &str) -> NomResult<Response> {
-    let (rem, res) = delimited(char('+'), not_line_ending, crlf)(input)?;
+    let (remainder, response) = delimited(char('+'), not_line_ending, crlf)(input)?;
 
-    Ok((rem, Response::SimpleString(res.to_string())))
+    Ok((remainder, Response::SimpleString(response.to_string())))
 }
 
 fn parse_error(input: &str) -> NomResult<Response> {
-    let (rem, res) = delimited(char('-'), not_line_ending, crlf)(input)?;
+    let (remainder, response) = delimited(char('-'), not_line_ending, crlf)(input)?;
 
-    Ok((rem, Response::Error(res.to_string())))
+    Ok((remainder, Response::Error(response.to_string())))
 }
 
 fn parse_integer(input: &str) -> NomResult<Response> {
-    let (rem, res) = delimited(char(':'), i64, crlf)(input)?;
+    let (remainder, response) = delimited(char(':'), i64, crlf)(input)?;
 
-    Ok((rem, Response::Integer(res)))
+    Ok((remainder, Response::Integer(response)))
 }
 
 fn parse_bulk_string(input: &str) -> NomResult<Response> {
-    let (rem, (_, _, _, data, _)) = tuple((char('$'), u64, crlf, not_line_ending, crlf))(input)?;
+    let (remainder, (_, _, _, data, _)) =
+        tuple((char('$'), u64, crlf, not_line_ending, crlf))(input)?;
 
-    Ok((rem, Response::Bulk(data.to_string())))
+    Ok((remainder, Response::Bulk(data.to_string())))
 }
 
 fn parse_null(input: &str) -> NomResult<Response> {
-    let (rem, _) = tuple((tag_no_case("$-1"), crlf))(input)?;
+    let (remainder, _) = tuple((tag_no_case("$-1"), crlf))(input)?;
 
-    Ok((rem, Response::Null))
+    Ok((remainder, Response::Null))
 }
 
 fn parse_array(input: &str) -> NomResult<Response> {
-    let (rem, amount) = delimited(char('*'), u64, crlf)(input)?;
-    let (rem, entries) = count(parse_response, amount as usize)(rem)?;
+    let (remainder, amount) = delimited(char('*'), u64, crlf)(input)?;
+    let (remainder, entries) = count(parse_response, amount as usize)(remainder)?;
 
-    Ok((rem, Response::Array(entries)))
+    Ok((remainder, Response::Array(entries)))
 }
 
 #[cfg(test)]
