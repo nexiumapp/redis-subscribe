@@ -123,12 +123,12 @@ impl RedisSub {
     async fn subscribe_stored(&self) -> crate::Result<()> {
         for channel in self.channels.lock().await.iter() {
             self.send_cmd(Command::Subscribe(channel.to_string()))
-                .await?
+                .await?;
         }
 
         for channel in self.pattern_channels.lock().await.iter() {
             self.send_cmd(Command::PatternSubscribe(channel.to_string()))
-                .await?
+                .await?;
         }
 
         Ok(())
