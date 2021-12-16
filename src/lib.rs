@@ -3,6 +3,9 @@ mod error;
 mod message;
 mod parser;
 
+#[macro_use]
+extern crate tracing;
+
 use std::cmp;
 use std::collections::HashSet;
 use std::time::Duration;
@@ -33,6 +36,8 @@ pub struct RedisSub {
     addr: String,
     /// Set of channels currently subscribed to.
     channels: Mutex<HashSet<String>>,
+    /// Set of channels currently subscribed to by pattern.
+    pattern_channels: Mutex<HashSet<String>>,
     /// TCP socket writer to write commands to.
     writer: Mutex<Option<OwnedWriteHalf>>,
 }
@@ -44,6 +49,7 @@ impl RedisSub {
         Self {
             addr: addr.to_string(),
             channels: Mutex::new(HashSet::new()),
+            pattern_channels: Mutex::new(HashSet::new()),
             writer: Mutex::new(None),
         }
     }

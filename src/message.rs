@@ -11,6 +11,7 @@ pub enum Message {
     Error(Error),
 }
 
+#[derive(Debug)]
 pub enum MessageParserError {
     NotString,
     InvalidChannelResponse,

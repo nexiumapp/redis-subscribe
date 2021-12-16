@@ -1,6 +1,7 @@
 use std::{io, str::Utf8Error};
 
 /// All possible errors returned by this library.
+#[derive(Debug)]
 pub enum Error {
     /// An IO error happened on the underlying TCP stream
     IoError(io::Error),
