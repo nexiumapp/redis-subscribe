@@ -1,4 +1,5 @@
 use super::parser;
+use crate::parser::Response;
 use crate::Error;
 
 #[derive(Debug)]
@@ -41,15 +42,15 @@ impl Message {
 
         // Match on the first element text.
         match channel.to_lowercase().as_str() {
-            "subscribe" => Message::from_subscribe(arr),
-            "unsubscribe" => Message::from_unsubscribe(arr),
-            "message" => Message::from_message(arr),
+            "subscribe" => Message::from_subscribe(&arr),
+            "unsubscribe" => Message::from_unsubscribe(&arr),
+            "message" => Message::from_message(&arr),
             _ => Err(Error::ParserError(ParserError::UnknownType)),
         }
     }
 
     /// parse the subscription message.
-    fn from_subscribe(res: Vec<parser::Response>) -> crate::Result<Self> {
+    fn from_subscribe(res: &[parser::Response]) -> crate::Result<Self> {
         let channel = match res.get(1) {
             Some(parser::Response::Bulk(channel)) => Ok((*channel).clone()),
             _ => Err(Error::ParserError(ParserError::InvalidSubscriptionChannel)),
@@ -67,7 +68,7 @@ impl Message {
     }
 
     /// parse the unsubscription message.
-    fn from_unsubscribe(res: Vec<parser::Response>) -> crate::Result<Self> {
+    fn from_unsubscribe(res: &[parser::Response]) -> crate::Result<Self> {
         let channel = match res.get(1) {
             Some(parser::Response::Bulk(channel)) => Ok((*channel).clone()),
             _ => Err(Error::ParserError(
@@ -87,7 +88,7 @@ impl Message {
     }
 
     /// parse the response to a message.
-    fn from_message(res: Vec<parser::Response>) -> crate::Result<Self> {
+    fn from_message(res: &[parser::Response]) -> crate::Result<Self> {
         let channel = match res.get(1) {
             Some(parser::Response::Bulk(channel)) => Ok((*channel).clone()),
             _ => Err(Error::ParserError(ParserError::InvalidSubscriptionChannel)),
