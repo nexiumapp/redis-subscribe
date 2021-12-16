@@ -223,3 +223,80 @@ impl RedisSub {
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use redis::AsyncCommands;
+    use tokio_stream::StreamExt;
+
+    #[tokio::test]
+    #[ignore]
+    pub async fn test_redis_sub() {
+        println!("opening redis connections");
+        let client =
+            redis::Client::open("redis://127.0.0.1/").expect("failed to create Redis client");
+        let mut connection = client
+            .get_tokio_connection()
+            .await
+            .expect("failed to open Redis connection");
+        let redis_sub = RedisSub::new("127.0.0.1:6379");
+        println!("subscribing to new redis channel");
+        redis_sub
+            .subscribe("1234".to_string())
+            .await
+            .expect("failed to subscribe to new Redis channel");
+        println!("spawning background future");
+        let f = tokio::spawn(async move {
+            {
+                println!("listening to redis subscriber");
+                let mut stream = redis_sub.listen().await;
+
+                println!("waiting for Redis connection to succeed");
+                let msg = stream.next().await.expect("expected a Message");
+                assert!(
+                    msg.is_connected(),
+                    "message after opening stream was not `Connected`: {:?}",
+                    msg
+                );
+
+                println!("waiting for Redis subscription to be returned");
+                let msg = stream.next().await.expect("expected a Message");
+                assert!(
+                    msg.is_subscription(),
+                    "message after connection was not `Subscription`: {:?}",
+                    msg
+                );
+
+                println!("waiting for Redis message");
+                let msg = stream.next().await.expect("expected a Message");
+                assert!(
+                    msg.is_message(),
+                    "message after subscription was not `Message`: {:?}",
+                    msg
+                );
+                match msg {
+                    Message::Message { channel, message } => {
+                        assert_eq!(channel, "1234".to_string());
+                        assert_eq!(message, "1234".to_string());
+                    }
+                    _ => unreachable!("already checked this is message"),
+                }
+            }
+
+            redis_sub
+        });
+
+        tokio::time::sleep(std::time::Duration::from_millis(250)).await;
+        connection
+            .publish::<&str, &str, u32>("1234", "1234")
+            .await
+            .expect("failed to send publish command to Redis");
+        let redis_sub = f.await.expect("background future failed");
+
+        redis_sub
+            .unsubscribe("1234".to_string())
+            .await
+            .expect("failed to unsubscribe from Redis channel");
+    }
+}

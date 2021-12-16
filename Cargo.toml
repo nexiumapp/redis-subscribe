@@ -22,3 +22,7 @@ tokio-stream = "0.1.8"
 async-stream = "0.3.2"
 rand = "0.8.4"
 tracing = "0.1"
+
+[dev-dependencies]
+tokio = { version = "1.15", features = ["rt-multi-thread", "test-util"] }
+redis = { version = "0.21", features = ["aio", "tokio-comp"] }
