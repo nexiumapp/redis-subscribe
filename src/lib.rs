@@ -45,6 +45,7 @@ pub struct RedisSub {
 impl RedisSub {
     /// Create the new Redis client.
     /// This does not connect to the server, use `.listen()` for that.
+    #[must_use]
     pub fn new(addr: &str) -> Self {
         Self {
             addr: addr.to_string(),
