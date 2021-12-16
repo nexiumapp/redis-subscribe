@@ -19,7 +19,7 @@ pub enum Response {
 
 type NomResult<'a, T> = IResult<&'a str, T>;
 
-pub fn parse<'a>(input: &mut String) -> Vec<Response> {
+pub fn parse(input: &mut String) -> Vec<Response> {
     let mut result = Vec::new();
 
     loop {
