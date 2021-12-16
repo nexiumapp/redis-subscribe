@@ -13,7 +13,10 @@ use tokio::io::AsyncReadExt;
 use tokio::time::sleep;
 use tokio::{
     io::AsyncWriteExt,
-    net::{tcp::OwnedWriteHalf, TcpStream},
+    net::{
+        tcp::{OwnedReadHalf, OwnedWriteHalf},
+        TcpStream,
+    },
     sync::Mutex,
 };
 use tokio_stream::Stream;
@@ -61,6 +64,22 @@ impl RedisSub {
         self.send_cmd(Command::Unsubscribe(channel)).await
     }
 
+    /// Subscribe to a pattern of channels.
+    pub async fn psubscribe(&self, channel: String) -> crate::Result<()> {
+        self.channels.lock().await.insert(channel.clone());
+
+        self.send_cmd(Command::PatternSubscribe(channel)).await
+    }
+
+    /// Unsubscribe from a pattern of channels.
+    pub async fn punsubscribe(&self, channel: String) -> crate::Result<()> {
+        if !self.channels.lock().await.remove(&channel) {
+            return Err(crate::Error::NotSubscribed);
+        }
+
+        self.send_cmd(Command::PatternUnsubscribe(channel)).await
+    }
+
     /// Connect to the Redis server specified by `self.addr`.
     ///
     /// Handles exponential backoff.
@@ -100,6 +119,11 @@ impl RedisSub {
                 .await?
         }
 
+        for channel in self.pattern_channels.lock().await.iter() {
+            self.send_cmd(Command::PatternSubscribe(channel.to_string()))
+                .await?
+        }
+
         Ok(())
     }
 
@@ -109,26 +133,23 @@ impl RedisSub {
     pub async fn listen(&self) -> impl Stream<Item = Message> + '_ {
         Box::pin(stream! {
             loop {
-                let (read, write) = self.connect().await;
+                let (mut read, write) = match self.connect().await {
+                    Ok(t) => t,
+                    Err(e) => {
+                        warn!("failed to connect to server: {:?}", e);
+                        continue;
+                    }
+                };
 
                 // Update the stored writer.
-                let mut stored_writer = self.writer.lock().await;
-                *stored_writer = Some(write);
-                drop(stored_writer);
-
-                let mut errored = false;
-                for channel in self.channels.lock().await.iter() {
-                    // Subscribe to all channels requested.
-                    match self.send_cmd(Command::Subscribe(channel.to_string())).await {
-                        Ok(_) => (),
-                        Err(_) => {
-                            errored = true;
-                        }
-                    }
+                {
+                    let mut stored_writer = self.writer.lock().await;
+                    *stored_writer = Some(write);
                 }
 
-                // Disconnect and reconnect if the subscriptions errored.
-                if errored {
+                // Subscribe to all stored channels
+                if let Err(e) = self.subscribe_stored().await {
+                    warn!("failed to subscribe to stored channels on connection, trying connection again... (err {:?})", e);
                     continue;
                 }
 
@@ -144,7 +165,7 @@ impl RedisSub {
                     let res = match read.read(&mut buf).await {
                         Ok(0) => Err(crate::Error::ZeroBytesRead),
                         Ok(n) => Ok(n),
-                        Err(e) => Err(e),
+                        Err(e) => Err(crate::Error::from(e)),
                     };
 
                     // Disconnect and reconnect if a write error occurred.
@@ -153,7 +174,6 @@ impl RedisSub {
                         Err(e) => {
                             *self.writer.lock().await = None;
                             yield Message::Disconnected(e);
-                            sleep(Duration::from_millis(500 + jitter)).await;
                             break 'inner;
                         }
                     };
@@ -189,7 +209,7 @@ impl RedisSub {
         if let Some(writer) = &mut *self.writer.lock().await {
             writer.writable().await?;
 
-            debug!("sending command {} to redis", &command);
+            debug!("sending command {:?} to redis", &command);
             writer.write_all(command.to_string().as_bytes()).await?;
         }
 
