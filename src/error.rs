@@ -12,7 +12,7 @@ pub enum Error {
     /// An error happened while decoding the data from Redis as UTF-8.
     Utf8Error(Utf8Error),
     /// The parser implementation returned an error.
-    ParserError(crate::message::MessageParserError),
+    ParserError(crate::message::ParserError),
 }
 
 impl From<io::Error> for Error {
