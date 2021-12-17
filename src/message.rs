@@ -15,6 +15,15 @@ pub enum Message {
         channel: String,
         message: String,
     },
+
+    PatternSubscription {
+        channel: String,
+        subscriptions: i64,
+    },
+    PatternUnsubscription {
+        channel: String,
+        subscriptions: i64,
+    },
     PatternMessage {
         pattern: String,
         channel: String,
@@ -63,6 +72,7 @@ impl Message {
             "unsubscribe" => Self::from_unsubscribe(&arr),
             "message" => Self::from_message(&arr),
             "pmessage" => Self::from_pmessage(&arr),
+            "psubscribe" => Self::from_psubscribe(&arr),
             _ => Err(Error::ParserError(ParserError::UnknownType)),
         }
     }
@@ -85,6 +95,23 @@ impl Message {
         })
     }
 
+    fn from_psubscribe(res: &[parser::Response]) -> crate::Result<Self> {
+        let channel = match res.get(1) {
+            Some(parser::Response::Bulk(channel)) => Ok((*channel).clone()),
+            _ => Err(Error::ParserError(ParserError::InvalidSubscriptionChannel)),
+        }?;
+
+        let subscriptions = match res.get(2) {
+            Some(parser::Response::Integer(subscriptions)) => Ok(*subscriptions),
+            _ => Err(Error::ParserError(ParserError::InvalidSubscriptionCount)),
+        }?;
+
+        Ok(Self::PatternSubscription {
+            channel,
+            subscriptions,
+        })
+    }
+
     /// parse the unsubscription message.
     fn from_unsubscribe(res: &[parser::Response]) -> crate::Result<Self> {
         let channel = match res.get(1) {
@@ -100,6 +127,25 @@ impl Message {
         }?;
 
         Ok(Self::Unsubscription {
+            channel,
+            subscriptions,
+        })
+    }
+
+    fn from_punsubscribe(res: &[parser::Response]) -> crate::Result<Self> {
+        let channel = match res.get(1) {
+            Some(parser::Response::Bulk(channel)) => Ok((*channel).clone()),
+            _ => Err(Error::ParserError(
+                ParserError::InvalidUnsubscriptionChannel,
+            )),
+        }?;
+
+        let subscriptions = match res.get(2) {
+            Some(parser::Response::Integer(subscriptions)) => Ok(*subscriptions),
+            _ => Err(Error::ParserError(ParserError::InvalidUnsubscriptionCount)),
+        }?;
+
+        Ok(Self::PatternUnsubscription {
             channel,
             subscriptions,
         })
@@ -154,8 +200,20 @@ impl Message {
 
     #[must_use]
     #[inline]
+    pub const fn is_pattern_subscription(&self) -> bool {
+        matches!(self, Self::PatternSubscription { .. })
+    }
+
+    #[must_use]
+    #[inline]
     pub const fn is_unsubscription(&self) -> bool {
         matches!(self, Self::Unsubscription { .. })
+    }
+
+    #[must_use]
+    #[inline]
+    pub const fn is_pattern_unsubscription(&self) -> bool {
+        matches!(self, Self::PatternUnsubscription { .. })
     }
 
     #[must_use]

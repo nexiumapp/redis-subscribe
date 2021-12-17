@@ -70,7 +70,7 @@ impl RedisSub {
     /// # Errors
     /// Returns an error if an error happens on the underlying TCP stream.
     pub async fn psubscribe(&self, channel: String) -> crate::Result<()> {
-        self.channels.lock().await.insert(channel.clone());
+        self.pattern_channels.lock().await.insert(channel.clone());
 
         self.send_cmd(Command::PatternSubscribe(channel)).await
     }
@@ -80,7 +80,7 @@ impl RedisSub {
     /// # Errors
     /// Returns an error if an error happens on the underlying TCP stream.
     pub async fn punsubscribe(&self, channel: String) -> crate::Result<()> {
-        if !self.channels.lock().await.remove(&channel) {
+        if !self.pattern_channels.lock().await.remove(&channel) {
             return Err(crate::Error::NotSubscribed);
         }
 
