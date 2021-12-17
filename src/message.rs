@@ -73,6 +73,7 @@ impl Message {
             "message" => Self::from_message(&arr),
             "pmessage" => Self::from_pmessage(&arr),
             "psubscribe" => Self::from_psubscribe(&arr),
+            "punsubscribe" => Self::from_punsubscribe(&arr),
             _ => Err(Error::ParserError(ParserError::UnknownType)),
         }
     }
