@@ -335,7 +335,7 @@ mod tests {
         let (client, mut connection, redis_sub) = get_redis_connections().await;
 
         redis_sub
-            .psubscribe("*1234*".to_string())
+            .psubscribe("*420*".to_string())
             .await
             .expect("failed to subscribe to new Redis channel");
         let f = tokio::spawn(async move {
@@ -357,8 +357,8 @@ mod tests {
                     .expect("timeout duration of 500 milliseconds was exceeded")
                     .expect("expected a Message");
                 assert!(
-                    msg.is_subscription(),
-                    "message after connection was not `Subscription`: {:?}",
+                    msg.is_pattern_subscription(),
+                    "message after connection was not `PatternSubscription`: {:?}",
                     msg
                 );
 
@@ -377,8 +377,8 @@ mod tests {
                         channel,
                         message,
                     } => {
-                        assert_eq!(pattern, "*1234*".to_string());
-                        assert_eq!(channel, "012345".to_string());
+                        assert_eq!(pattern, "*420*".to_string());
+                        assert_eq!(channel, "64209".to_string());
                         assert_eq!(message, "123456".to_string());
                     }
                     _ => unreachable!("already checked this is message"),
@@ -391,13 +391,13 @@ mod tests {
         // 100 milliseconds longer than the maximum timeout for connection failure
         tokio::time::sleep(Duration::from_millis(1100)).await;
         connection
-            .publish::<&str, &str, u32>("012345", "123456")
+            .publish::<&str, &str, u32>("64209", "123456")
             .await
             .expect("failed to send publish command to Redis");
         let redis_sub = f.await.expect("background future failed");
 
         redis_sub
-            .punsubscribe("*1234*".to_string())
+            .punsubscribe("*420*".to_string())
             .await
             .expect("failed to unsubscribe from Redis channel");
     }
