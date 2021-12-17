@@ -251,7 +251,6 @@ mod tests {
     use tokio_stream::StreamExt;
 
     async fn get_redis_connections() -> (redis::Client, redis::aio::Connection, RedisSub) {
-        println!("opening redis connections");
         let client =
             redis::Client::open("redis://127.0.0.1/").expect("failed to create Redis client");
         let connection = client
@@ -267,18 +266,14 @@ mod tests {
     async fn test_redis_sub() {
         let (client, mut connection, redis_sub) = get_redis_connections().await;
 
-        println!("subscribing to new redis channel");
         redis_sub
             .subscribe("1234".to_string())
             .await
             .expect("failed to subscribe to new Redis channel");
-        println!("spawning background future");
         let f = tokio::spawn(async move {
             {
-                println!("listening to redis subscriber");
                 let mut stream = redis_sub.listen().await;
 
-                println!("waiting for Redis connection to succeed");
                 let msg = tokio::time::timeout(Duration::from_millis(500), stream.next())
                     .await
                     .expect("timeout duration of 500 milliseconds was exceeded")
@@ -289,7 +284,6 @@ mod tests {
                     msg
                 );
 
-                println!("waiting for Redis subscription to be returned");
                 let msg = tokio::time::timeout(Duration::from_millis(500), stream.next())
                     .await
                     .expect("timeout duration of 500 milliseconds was exceeded")
@@ -300,7 +294,6 @@ mod tests {
                     msg
                 );
 
-                println!("waiting for Redis message");
                 let msg = tokio::time::timeout(Duration::from_secs(2), stream.next())
                     .await
                     .expect("timeout duration of 2 seconds was exceeded")
@@ -341,18 +334,14 @@ mod tests {
     pub async fn test_redis_pattern_sub() {
         let (client, mut connection, redis_sub) = get_redis_connections().await;
 
-        println!("subscribing to new redis channel");
         redis_sub
             .psubscribe("*1234*".to_string())
             .await
             .expect("failed to subscribe to new Redis channel");
-        println!("spawning background future");
         let f = tokio::spawn(async move {
             {
-                println!("listening to redis subscriber");
                 let mut stream = redis_sub.listen().await;
 
-                println!("waiting for Redis connection to succeed");
                 let msg = tokio::time::timeout(Duration::from_millis(500), stream.next())
                     .await
                     .expect("timeout duration of 500 milliseconds was exceeded")
@@ -363,7 +352,6 @@ mod tests {
                     msg
                 );
 
-                println!("waiting for Redis subscription to be returned");
                 let msg = tokio::time::timeout(Duration::from_millis(500), stream.next())
                     .await
                     .expect("timeout duration of 500 milliseconds was exceeded")
@@ -374,7 +362,6 @@ mod tests {
                     msg
                 );
 
-                println!("waiting for Redis message");
                 let msg = tokio::time::timeout(Duration::from_secs(2), stream.next())
                     .await
                     .expect("timeout duration of 2 seconds was exceeded")
