@@ -272,7 +272,10 @@ mod tests {
             .expect("failed to subscribe to new Redis channel");
         let f = tokio::spawn(async move {
             {
-                let mut stream = redis_sub.listen().await;
+                let mut stream = redis_sub
+                    .listen()
+                    .await
+                    .expect("failed to connect to redis");
 
                 let msg = tokio::time::timeout(Duration::from_millis(500), stream.next())
                     .await
@@ -323,10 +326,22 @@ mod tests {
             .expect("failed to send publish command to Redis");
         let redis_sub = f.await.expect("background future failed");
 
+        let mut stream = redis_sub
+            .listen()
+            .await
+            .expect("failed to connect to redis");
+        let _ = stream.next().await;
+        let _ = stream.next().await;
         redis_sub
             .unsubscribe("1234".to_string())
             .await
             .expect("failed to unsubscribe from Redis channel");
+        let msg = stream.next().await.expect("expected a Message");
+        assert!(
+            msg.is_unsubscription(),
+            "message after unsubscription was not `Unsubscription`: {:?}",
+            msg
+        )
     }
 
     #[tokio::test]
@@ -340,7 +355,10 @@ mod tests {
             .expect("failed to subscribe to new Redis channel");
         let f = tokio::spawn(async move {
             {
-                let mut stream = redis_sub.listen().await;
+                let mut stream = redis_sub
+                    .listen()
+                    .await
+                    .expect("failed to connect to redis");
 
                 let msg = tokio::time::timeout(Duration::from_millis(500), stream.next())
                     .await
@@ -396,9 +414,21 @@ mod tests {
             .expect("failed to send publish command to Redis");
         let redis_sub = f.await.expect("background future failed");
 
+        let mut stream = redis_sub
+            .listen()
+            .await
+            .expect("failed to connect to redis");
+        let _ = stream.next().await;
+        let _ = stream.next().await;
         redis_sub
             .punsubscribe("*420*".to_string())
             .await
             .expect("failed to unsubscribe from Redis channel");
+        let msg = stream.next().await.expect("expected a Message");
+        assert!(
+            msg.is_pattern_unsubscription(),
+            "message after unsubscription was not `Unsubscription`: {:?}",
+            msg
+        )
     }
 }
