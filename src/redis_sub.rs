@@ -95,7 +95,10 @@ impl RedisSub {
     ///
     /// # Errors
     /// Returns an error if attempting connection failed eight times.
-    pub(crate) async fn connect(&self) -> crate::Result<(OwnedReadHalf, OwnedWriteHalf)> {
+    pub(crate) async fn connect(
+        &self,
+        fail_fast: bool,
+    ) -> crate::Result<(OwnedReadHalf, OwnedWriteHalf)> {
         let mut retry_count = 0;
 
         loop {
@@ -104,7 +107,8 @@ impl RedisSub {
             // Connect to the Redis server.
             match TcpStream::connect(self.addr.as_str()).await {
                 Ok(stream) => return Ok(stream.into_split()),
-                Err(_) if retry_count <= 7 => {
+                Err(e) if fail_fast => return Err(crate::Error::IoError(e)),
+                Err(e) if retry_count <= 7 => {
                     // Backoff and reconnect.
                     warn!(
                         "failed to connect to redis (attempt {}/8) {:?}",
@@ -141,10 +145,15 @@ impl RedisSub {
     /// Listen for incoming messages.
     /// Only here the server connects to the Redis server.
     /// It handles reconnection and backoff for you.
-    pub async fn listen(&self) -> impl Stream<Item = Message> + '_ {
-        Box::pin(stream! {
+    ///
+    /// # Errors
+    /// Returns an error if the first connection attempt fails
+    pub async fn listen(&self) -> crate::Result<impl Stream<Item = Message> + '_> {
+        self.connect(true).await?;
+
+        Ok(Box::pin(stream! {
             loop {
-                let (mut read, write) = match self.connect().await {
+                let (mut read, write) = match self.connect(false).await {
                     Ok(t) => t,
                     Err(e) => {
                         warn!("failed to connect to server: {:?}", e);
@@ -219,7 +228,7 @@ impl RedisSub {
                     }
                 }
             }
-        })
+        }))
     }
 
     /// Send a command to the server.
