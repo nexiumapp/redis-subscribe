@@ -106,6 +106,10 @@ impl RedisSub {
                 Ok(stream) => return Ok(stream.into_split()),
                 Err(_) if retry_count <= 7 => {
                     // Backoff and reconnect.
+                    warn!(
+                        "failed to connect to redis (attempt {}/8) {:?}",
+                        retry_count, e
+                    );
                     retry_count += 1;
                     let timeout = cmp::min(retry_count ^ 2, 64) * 1000 + jitter;
                     sleep(Duration::from_millis(timeout)).await;
@@ -150,11 +154,13 @@ impl RedisSub {
 
                 // Update the stored writer.
                 {
+                    debug!("updating stored Redis TCP writer");
                     let mut stored_writer = self.writer.lock().await;
                     *stored_writer = Some(write);
                 }
 
                 // Subscribe to all stored channels
+                debug!("subscribing to stored channels after connect");
                 if let Err(e) = self.subscribe_stored().await {
                     warn!("failed to subscribe to stored channels on connection, trying connection again... (err {:?})", e);
                     continue;
@@ -168,6 +174,7 @@ impl RedisSub {
                 let mut unread_buf = String::new();
 
                 'inner: loop {
+                    debug!("reading incoming data");
                     // Read incoming data to the buffer.
                     let res = match read.read(&mut buf).await {
                         Ok(0) => Err(crate::Error::ZeroBytesRead),
@@ -200,10 +207,14 @@ impl RedisSub {
 
                     // Loop through the parsed commands.
                     for res in parsed {
+                        debug!("new message");
                         // Create a message from the parsed command and yield it.
                         match Message::from_response(res) {
                             Ok(msg) => yield msg,
-                            Err(_) => continue,
+                            Err(e) => {
+                                warn!("failed to parse message: {:?}", e);
+                                continue;
+                            },
                         };
                     }
                 }
