@@ -322,7 +322,8 @@ mod tests {
             redis_sub
         });
 
-        tokio::time::sleep(Duration::from_secs(1)).await;
+        // 100 milliseconds longer than the maximum timeout for Redis connection
+        tokio::time::sleep(Duration::from_millis(1100)).await;
         connection
             .publish::<&str, &str, u32>("1234", "1234")
             .await
@@ -400,7 +401,8 @@ mod tests {
             redis_sub
         });
 
-        tokio::time::sleep(Duration::from_secs(1)).await;
+        // 100 milliseconds longer than the maximum timeout for connection failure
+        tokio::time::sleep(Duration::from_millis(1100)).await;
         connection
             .publish::<&str, &str, u32>("012345", "123456")
             .await
