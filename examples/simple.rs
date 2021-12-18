@@ -12,7 +12,10 @@ pub async fn main() {
 
     // Listen for incomming messages.
     tokio::spawn(async move {
-        let mut stream = redis_listener.listen().await;
+        let mut stream = redis_listener
+            .listen()
+            .await
+            .expect("failed to connect to Redis");
 
         // Use a stream to loop trough all messages.
         while let Some(msg) = stream.next().await {
