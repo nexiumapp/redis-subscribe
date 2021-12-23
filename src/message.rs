@@ -1,3 +1,5 @@
+use thiserror::Error;
+
 use super::parser;
 use crate::Error;
 
@@ -34,18 +36,16 @@ pub enum Message {
     Error(Error),
 }
 
-#[derive(Debug)]
+#[derive(Error, Debug)]
 pub enum ParserError {
-    NotString,
-    InvalidChannelResponse,
-    UnknownType,
-
-    InvalidSubscriptionChannel,
-    InvalidSubscriptionCount,
-    InvalidSubscriptionPattern,
-
-    InvalidUnsubscriptionChannel,
-    InvalidUnsubscriptionCount,
+    #[error("The response has an invalid format.")]
+    MalformedResponse,
+    #[error("The provided channel was invalid.")]
+    InvalidChannel,
+    #[error("The provided amount of subscribers is invalid.")]
+    InvalidSubscriberCount,
+    #[error("The provided pattern is invalid.")]
+    InvalidPattern,
 }
 
 impl Message {
@@ -57,13 +57,13 @@ impl Message {
         // Make sure the response is a array.
         let arr = match res {
             parser::Response::Array(arr) => Ok(arr),
-            _ => Err(Error::ParserError(ParserError::NotString)),
+            _ => Err(ParserError::MalformedResponse),
         }?;
 
         // Get the first element of the array.
         let channel = match arr.get(0) {
             Some(parser::Response::Bulk(channel)) => Ok(channel.as_str()),
-            _ => Err(Error::ParserError(ParserError::InvalidChannelResponse)),
+            _ => Err(ParserError::MalformedResponse),
         }?;
 
         // Match on the first element text.
@@ -74,7 +74,7 @@ impl Message {
             "pmessage" => Self::from_pmessage(&arr),
             "psubscribe" => Self::from_psubscribe(&arr),
             "punsubscribe" => Self::from_punsubscribe(&arr),
-            _ => Err(Error::ParserError(ParserError::UnknownType)),
+            _ => Err(Error::ParserError(ParserError::MalformedResponse)),
         }
     }
 
@@ -82,12 +82,12 @@ impl Message {
     fn from_subscribe(res: &[parser::Response]) -> crate::Result<Self> {
         let channel = match res.get(1) {
             Some(parser::Response::Bulk(channel)) => Ok((*channel).clone()),
-            _ => Err(Error::ParserError(ParserError::InvalidSubscriptionChannel)),
+            _ => Err(ParserError::InvalidChannel),
         }?;
 
         let subscriptions = match res.get(2) {
             Some(parser::Response::Integer(subscriptions)) => Ok(*subscriptions),
-            _ => Err(Error::ParserError(ParserError::InvalidSubscriptionCount)),
+            _ => Err(ParserError::InvalidSubscriberCount),
         }?;
 
         Ok(Self::Subscription {
@@ -99,12 +99,12 @@ impl Message {
     fn from_psubscribe(res: &[parser::Response]) -> crate::Result<Self> {
         let channel = match res.get(1) {
             Some(parser::Response::Bulk(channel)) => Ok((*channel).clone()),
-            _ => Err(Error::ParserError(ParserError::InvalidSubscriptionChannel)),
+            _ => Err(ParserError::InvalidChannel),
         }?;
 
         let subscriptions = match res.get(2) {
             Some(parser::Response::Integer(subscriptions)) => Ok(*subscriptions),
-            _ => Err(Error::ParserError(ParserError::InvalidSubscriptionCount)),
+            _ => Err(ParserError::InvalidSubscriberCount),
         }?;
 
         Ok(Self::PatternSubscription {
@@ -117,14 +117,12 @@ impl Message {
     fn from_unsubscribe(res: &[parser::Response]) -> crate::Result<Self> {
         let channel = match res.get(1) {
             Some(parser::Response::Bulk(channel)) => Ok((*channel).clone()),
-            _ => Err(Error::ParserError(
-                ParserError::InvalidUnsubscriptionChannel,
-            )),
+            _ => Err(ParserError::InvalidChannel),
         }?;
 
         let subscriptions = match res.get(2) {
             Some(parser::Response::Integer(subscriptions)) => Ok(*subscriptions),
-            _ => Err(Error::ParserError(ParserError::InvalidUnsubscriptionCount)),
+            _ => Err(ParserError::InvalidSubscriberCount),
         }?;
 
         Ok(Self::Unsubscription {
@@ -136,14 +134,12 @@ impl Message {
     fn from_punsubscribe(res: &[parser::Response]) -> crate::Result<Self> {
         let channel = match res.get(1) {
             Some(parser::Response::Bulk(channel)) => Ok((*channel).clone()),
-            _ => Err(Error::ParserError(
-                ParserError::InvalidUnsubscriptionChannel,
-            )),
+            _ => Err(ParserError::InvalidChannel),
         }?;
 
         let subscriptions = match res.get(2) {
             Some(parser::Response::Integer(subscriptions)) => Ok(*subscriptions),
-            _ => Err(Error::ParserError(ParserError::InvalidUnsubscriptionCount)),
+            _ => Err(ParserError::InvalidSubscriberCount),
         }?;
 
         Ok(Self::PatternUnsubscription {
@@ -156,12 +152,12 @@ impl Message {
     fn from_message(res: &[parser::Response]) -> crate::Result<Self> {
         let channel = match res.get(1) {
             Some(parser::Response::Bulk(channel)) => Ok((*channel).clone()),
-            _ => Err(Error::ParserError(ParserError::InvalidSubscriptionChannel)),
+            _ => Err(ParserError::InvalidChannel),
         }?;
 
         let message = match res.get(2) {
             Some(parser::Response::Bulk(message)) => Ok((*message).clone()),
-            _ => Err(Error::ParserError(ParserError::InvalidSubscriptionCount)),
+            _ => Err(ParserError::InvalidSubscriberCount),
         }?;
 
         Ok(Self::Message { channel, message })
@@ -171,17 +167,17 @@ impl Message {
     fn from_pmessage(res: &[parser::Response]) -> crate::Result<Self> {
         let pattern = match res.get(1) {
             Some(parser::Response::Bulk(pattern)) => Ok((*pattern).clone()),
-            _ => Err(Error::ParserError(ParserError::InvalidSubscriptionPattern)),
+            _ => Err(ParserError::InvalidPattern),
         }?;
 
         let channel = match res.get(2) {
             Some(parser::Response::Bulk(channel)) => Ok((*channel).clone()),
-            _ => Err(Error::ParserError(ParserError::InvalidSubscriptionChannel)),
+            _ => Err(ParserError::InvalidChannel),
         }?;
 
         let message = match res.get(3) {
             Some(parser::Response::Bulk(message)) => Ok((*message).clone()),
-            _ => Err(Error::ParserError(ParserError::InvalidSubscriptionCount)),
+            _ => Err(ParserError::InvalidSubscriberCount),
         }?;
 
         Ok(Self::PatternMessage {

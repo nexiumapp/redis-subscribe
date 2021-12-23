@@ -28,16 +28,26 @@ pub async fn main() {
     let channel4_sub = sub.clone();
 
     // Subscribe to four channels.
-    sub.subscribe("channel1".to_string()).await;
-    sub.subscribe("channel2".to_string()).await;
-    tokio::spawn(async move { channel3_sub.subscribe("channel3".to_string()).await });
-    tokio::spawn(async move { channel4_sub.subscribe("channel4".to_string()).await });
+    sub.subscribe("channel1".to_string()).await.unwrap();
+    sub.subscribe("channel2".to_string()).await.unwrap();
+    tokio::spawn(async move {
+        channel3_sub
+            .subscribe("channel3".to_string())
+            .await
+            .unwrap()
+    });
+    tokio::spawn(async move {
+        channel4_sub
+            .subscribe("channel4".to_string())
+            .await
+            .unwrap()
+    });
 
     // Sleep for 5 seconds.
     sleep(Duration::from_millis(5 * 1000)).await;
 
     // Unsubscribe from the first channel.
-    sub.unsubscribe("channel1".to_string()).await;
+    sub.unsubscribe("channel1".to_string()).await.unwrap();
 
     // Sleep for 10 seconds, afterwards program will exit.
     sleep(Duration::from_millis(10 * 1000)).await;

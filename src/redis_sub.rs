@@ -1,20 +1,21 @@
-use crate::{parser, Command, Message};
-use async_stream::stream;
-use rand::{thread_rng, Rng};
 use std::cmp;
 use std::collections::HashSet;
 use std::time::Duration;
-use tokio::io::AsyncReadExt;
-use tokio::time::sleep;
+
+use async_stream::stream;
+use rand::{thread_rng, Rng};
 use tokio::{
-    io::AsyncWriteExt,
+    io::{AsyncReadExt, AsyncWriteExt},
     net::{
         tcp::{OwnedReadHalf, OwnedWriteHalf},
         TcpStream,
     },
     sync::Mutex,
+    time::sleep,
 };
 use tokio_stream::Stream;
+
+use crate::{parser, Command, Message};
 
 /// Redis subscription object.
 /// This connects to the Redis server.
@@ -262,9 +263,8 @@ mod tests {
     }
 
     #[tokio::test]
-    #[ignore]
     async fn test_redis_sub() {
-        let (client, mut connection, redis_sub) = get_redis_connections().await;
+        let (_client, mut connection, redis_sub) = get_redis_connections().await;
 
         redis_sub
             .subscribe("1234".to_string())
@@ -345,9 +345,8 @@ mod tests {
     }
 
     #[tokio::test]
-    #[ignore]
     pub async fn test_redis_pattern_sub() {
-        let (client, mut connection, redis_sub) = get_redis_connections().await;
+        let (_client, mut connection, redis_sub) = get_redis_connections().await;
 
         redis_sub
             .psubscribe("*420*".to_string())

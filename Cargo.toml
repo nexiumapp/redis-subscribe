@@ -1,6 +1,6 @@
 [package]
 name = "redis-subscribe"
-version = "0.2.0"
+version = "0.2.1"
 edition = "2021"
 description = "Easily subscribe and unsubscribe to redis pubsub."
 license = "MIT"
@@ -21,7 +21,8 @@ tokio = { version = "1.13.0", features = [
 tokio-stream = "0.1.8"
 async-stream = "0.3.2"
 rand = "0.8.4"
-tracing = "0.1"
+tracing = "0.1.29"
+thiserror = "1.0.30"
 
 [dev-dependencies]
 tokio = { version = "1.15", features = ["rt-multi-thread", "test-util"] }
